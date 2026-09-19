@@ -1,0 +1,15 @@
+build/
+.cache/
+*.keystore
+*.jks
+*.apk
+*.idsig
+*.aab
+*.log
+.env
+.env.*
+!.env.example
+local.properties
+codex-bridge/workspace/
+__pycache__/
+*.pyc

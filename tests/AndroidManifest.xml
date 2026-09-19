@@ -1,0 +1,1 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.navix.agent.tests"><application android:label="DroidPilot Bridge Tests"/><instrumentation android:name="dev.navix.agent.AppProbe" android:targetPackage="dev.navix.agent"/><instrumentation android:name="dev.navix.agent.ServiceGoalProbe" android:targetPackage="dev.navix.agent"/></manifest>

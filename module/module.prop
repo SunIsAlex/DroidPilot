@@ -1,0 +1,6 @@
+id=navi_agent
+name=DroidPilot Root Bridge
+version=0.9.0
+versionCode=12
+author=Local
+description=Root UI Automation bridge for DroidPilot: semantic nodes, click, long press and text input. No system mount.
