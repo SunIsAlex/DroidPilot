@@ -52,7 +52,7 @@ final class CodexBackend {
         try(LocalSocket socket=connect(context)) {
             synchronized(writes) {
             Wire.write(socket.getOutputStream(),new JSONObject().put("op","codex_bridge").put("request",new JSONObject().put("paused",paused).put("op","start").put("goal",goal).put("model",model)
-                .put("thinking",thinking).put("goalMode",goalMode).put("instructions",TaskPolicy.instructions(goalMode)).put("tools",TaskPolicy.tools(goalMode))));
+                .put("thinking",thinking).put("goalMode",goalMode).put("instructions",TaskPolicy.instructions(goalMode,context.getSharedPreferences("config",0).getBoolean("background_mode",false))).put("tools",TaskPolicy.tools(goalMode))));
             bridgeReady=true;
             }
             // Drain heartbeats even when the execution worker is paused.

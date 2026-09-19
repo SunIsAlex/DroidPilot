@@ -5,6 +5,9 @@ final class TaskPolicy {
         + "每次操作后根据工具返回重新检查结果；只有任务全部完成并有工具结果作为依据时，调用 complete_task(summary,evidence)。"
         + "普通文字回复不能结束任务。如果上一轮未完成，则从当前状态继续，不重复已成功的发送、提交等操作。遇到工具错误请观察现状并调整方法。缺少必要信息、用户偏好或需用户处理的步骤时调用 ask_user 提出具体问题，可附最多4个选项。工具会等待真实用户回复后返回，不能编造答案、把等待当完成或反复猜测；收到回答后先观察当前页面再继续。";
     static String instructions(boolean goal) { return Protocol.SYSTEM+(goal?GOAL:""); }
+    static String instructions(boolean goal,boolean background) {
+        return instructions(goal)+(background ? "\n当前为后台虚拟屏模式，所有页面操作固定在独立显示器，不操作用户主屏。先用 switch_app/launch_app 将目标应用打开到虚拟屏再 observe；无法观察时不要切回主屏。标准编辑框使用 phone set_text；input_text/input_key 临时输入法和 home 暂不支持。am 只允许查询类子命令。后台和主屏不可同时操控同一应用任务。显示器已关闭、应用不兼容或编辑器不支持时如实报告，Goal 可 ask_user 询问如何继续。任务结束后应用继续留在虚拟屏，不需要强制回桌面。" : "");
+    }
     static JSONArray tools(boolean goal) throws Exception {
         JSONArray tools=Protocol.tools();
         if(goal) tools.put(new JSONObject().put("type","function").put("function",new JSONObject().put("name","complete_task")

@@ -23,7 +23,7 @@ public final class MainActivity extends Activity {
     }
     private EditText key, model, goal, codexModel;
     private Spinner backend, deepseekThinking, codexThinking;
-    private Switch goalMode, taskOverlay;
+    private Switch goalMode, taskOverlay, backgroundMode;
     private LinearLayout deepseekFields, codexFields;
     private TextView state, connection, questionText;
     private LinearLayout questionCard, questionOptions;
@@ -90,6 +90,16 @@ public final class MainActivity extends Activity {
         goalMode=new Switch(this); goalMode.setText("Goal 模式：持续执行直到完成");
         goalMode.setChecked(getSharedPreferences("config",0).getBoolean("goal_mode",false)); column.addView(goalMode);
         label("Goal 模式不受 25 步 / 8 分钟限制，可能持续消耗额度；可随时停止。锁屏时暂停。",14);
+        backgroundMode=new Switch(this); backgroundMode.setText("后台虚拟屏（实验性）");
+        backgroundMode.setChecked(getSharedPreferences("config",0).getBoolean("background_mode",false)); column.addView(backgroundMode);
+        label("AI 在隐藏的独立屏幕操作目标 App，主屏可继续使用。部分 App 不支持；后台输入仅支持标准文本控件，不切换主屏键盘。",14);
+        button("关闭后台虚拟屏 / 将应用移回主屏",() -> {
+            if(AgentService.running) { toast("请先停止当前任务"); return; }
+            new Thread(() -> {
+                try { JSONObject result=Wire.call(new JSONObject().put("op","background_close")); runOnUiThread(() -> toast(result.optBoolean("ok")?"后台虚拟屏已关闭，系统将处理应用任务迁移":"关闭失败："+result.optString("error"))); }
+                catch(Exception error) { runOnUiThread(() -> toast("无法连接 Root 服务")); }
+            }).start();
+        });
         taskOverlay=new Switch(this); taskOverlay.setText("任务悬浮状态条");
         taskOverlay.setChecked(getSharedPreferences("config",0).getBoolean("task_overlay",true)); column.addView(taskOverlay);
         label("显示思考、操作、读取和等待状态；运行时点击暂停/继续，结束后半透明保留，点击打开助手。",14);
@@ -135,7 +145,7 @@ public final class MainActivity extends Activity {
         try {
             boolean useCodex=backend.getSelectedItemPosition()==1;
             android.content.SharedPreferences.Editor config=getSharedPreferences("config",0).edit()
-                .putString("backend",useCodex?"codex":"deepseek").putBoolean("goal_mode",goalMode.isChecked()).putBoolean("task_overlay",taskOverlay.isChecked());
+                .putString("backend",useCodex?"codex":"deepseek").putBoolean("goal_mode",goalMode.isChecked()).putBoolean("task_overlay",taskOverlay.isChecked()).putBoolean("background_mode",backgroundMode.isChecked());
             if (useCodex) {
                 config.putString("codex_model",codexModel.getText().toString().trim()).putInt("codex_thinking",codexThinking.getSelectedItemPosition());
             } else {

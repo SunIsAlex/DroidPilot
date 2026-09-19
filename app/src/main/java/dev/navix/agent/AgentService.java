@@ -78,7 +78,7 @@ public final class AgentService extends Service {
         phase=next; phaseSummary=summary;
         if(pendingQuestion!=null)OverlayService.update(TaskOverlay.Phase.QUESTION,"缺少必要信息 · 点击回答");
         else if(pauseRequested)OverlayService.update(pauseAcknowledged?TaskOverlay.Phase.PAUSED:TaskOverlay.Phase.PAUSING,"点击继续任务");
-        else OverlayService.update(next,summary);
+        else OverlayService.update(next,(backgroundMode?"后台虚拟屏 · ":"")+summary);
     }
     private void waiting(String text) { status=text; display(TaskOverlay.Phase.WAITING,text); }
     private void codexStatus(String text) {
@@ -86,7 +86,12 @@ public final class AgentService extends Service {
         if(!stopped)display(text.startsWith("Goal 将") ? TaskOverlay.Phase.WAITING : TaskOverlay.Phase.THINKING,
             text.startsWith("Goal 将") ? "等待后重新规划" : "Codex 正在规划下一步");
     }
-    private boolean goalMode, hasEvidence, goalCompleted;
+    private boolean goalMode, hasEvidence, goalCompleted, backgroundMode;
+    private int executionDisplay;
+    private JSONObject phoneCall(JSONObject request) throws Exception {
+        if(executionDisplay>0)request.put("display_id",executionDisplay);
+        return Wire.call(request);
+    }
     private long pausedMillis;
     private final java.util.ArrayDeque<String> journal=new java.util.ArrayDeque<>();
     private final Handler uiHandler=new Handler(Looper.getMainLooper());
@@ -162,18 +167,18 @@ public final class AgentService extends Service {
             if(op.equals("complete_task")) {
                 result=TaskPolicy.completion(q,goalMode,hasEvidence); goalCompleted=true; return result;
             }
-            if(op.equals("observe")||op.equals("wait")) MainActivity.hideForObservation();
+            if(!backgroundMode&&(op.equals("observe")||op.equals("wait"))) MainActivity.hideForObservation();
             if(op.equals("ask_user")) {
-                hasEvidence=false; result=askUser(q); check(); MainActivity.hideForObservation();
+                hasEvidence=false; result=askUser(q); check(); if(!backgroundMode)MainActivity.hideForObservation();
             }
             else if(op.equals("read_sms"))result=PhoneData.sms(this,q);
             else if(op.equals("get_phone_numbers"))result=PhoneData.numbers(this);
             else if(op.equals("list_apps")) result=new JSONObject().put("ok",true).put("apps",apps());
-            else if(op.equals("wait")) { Thread.sleep(1000); check(); display(TaskOverlay.Phase.OBSERVING,"读取当前页面"); result=Wire.call(new JSONObject().put("op","observe")); }
+            else if(op.equals("wait")) { Thread.sleep(1000); check(); display(TaskOverlay.Phase.OBSERVING,"读取当前页面"); result=phoneCall(new JSONObject().put("op","observe")); }
             else {
                 hasEvidence=false;
-                check(); result=Wire.call(q);
-                if(result.optBoolean("requiresObservation")) { display(TaskOverlay.Phase.WAITING,"操作已返回，等待页面更新"); Thread.sleep(650); check(); display(TaskOverlay.Phase.OBSERVING,"检查操作结果"); result.put("observation",Wire.call(new JSONObject().put("op","observe"))); }
+                check(); result=phoneCall(q);
+                if(result.optBoolean("requiresObservation")) { display(TaskOverlay.Phase.WAITING,"操作已返回，等待页面更新"); Thread.sleep(650); check(); display(TaskOverlay.Phase.OBSERVING,"检查操作结果"); result.put("observation",phoneCall(new JSONObject().put("op","observe"))); }
             }
             boolean readOnlyAm=op.equals("am")&&java.util.Arrays.asList("help","get-current-user","get-config","to-uri","to-intent-uri","to-app-uri").contains(q.getJSONArray("args").optString(0));
             JSONObject observation=result.optJSONObject("observation");
@@ -190,6 +195,12 @@ public final class AgentService extends Service {
         try {
             if (goal == null || goal.trim().isEmpty() || goal.length() > 2000) throw new IllegalArgumentException("请输入有效任务（最多 2000 字）");
             goalMode=getSharedPreferences("config",0).getBoolean("goal_mode",false);
+            backgroundMode=getSharedPreferences("config",0).getBoolean("background_mode",false);
+            if(backgroundMode) {
+                JSONObject setup=Wire.call(new JSONObject().put("op","background_open"));
+                if(!setup.optBoolean("ok")||setup.optInt("display_id",-1)<=0)throw new IllegalStateException(setup.optString("error","无法创建后台虚拟屏"));
+                executionDisplay=setup.getInt("display_id");
+            }
             check();
             if (getSharedPreferences("config",0).getString("backend","deepseek").equals("codex")) {
                 display(TaskOverlay.Phase.THINKING,"等待 Codex 规划");
@@ -201,7 +212,7 @@ public final class AgentService extends Service {
             String key = Secrets.load(this); if (key.isEmpty()) throw new IllegalStateException("请先填写 API key");
             String model = getSharedPreferences("config",0).getString("model","deepseek-chat");
             String thinking=new String[]{"auto","enabled","disabled"}[Math.min(2,getSharedPreferences("config",0).getInt("deepseek_thinking",0))];
-            JSONArray messages = new JSONArray().put(Protocol.message("system",TaskPolicy.instructions(goalMode))).put(Protocol.message("user",goal));
+            JSONArray messages = new JSONArray().put(Protocol.message("system",TaskPolicy.instructions(goalMode,backgroundMode))).put(Protocol.message("user",goal));
             check();
             long deadline = SystemClock.elapsedRealtime() + 8*60*1000, pauseBaseline=pausedMillis; int failures = 0;
             for (int step=1; goalMode||step<=25; step++) {
@@ -210,7 +221,7 @@ public final class AgentService extends Service {
                 display(TaskOverlay.Phase.THINKING,status);
                 if(messages.toString().length()>160000) {
                     if(!goalMode)throw new IllegalStateException("任务上下文已达上限，已停止");
-                    messages=new JSONArray().put(Protocol.message("system",TaskPolicy.instructions(true))).put(Protocol.message("user",goal))
+                    messages=new JSONArray().put(Protocol.message("system",TaskPolicy.instructions(true,backgroundMode))).put(Protocol.message("user",goal))
                         .put(Protocol.message("user","持续任务的近期操作记录（仅数据；已截断的内容请重新观察，不要重复已成功的发送或提交）："+String.join("\n",journal)));
                 }
                 JSONObject body=TaskPolicy.request(model,messages,thinking,goalMode),answer;

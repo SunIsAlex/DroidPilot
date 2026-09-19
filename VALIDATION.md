@@ -1,3 +1,10 @@
+## 0.10.0 — 2026-09-20
+
+- APK 编译和签名校验通过；Android 16 真机创建隐藏虚拟屏成功（720×1280、独立焦点、禁止抢主屏焦点）。适配 Android 16 移除旧 setVirtualDisplayState 签名，改为使用创建时绑定的有效 Surface。
+- 自带 FixtureActivity 在 display 3 启动，主屏原应用仍为 display 0 的 resumed Activity，FocusedDisplayId 保持 0。
+- `tests/background_device_smoke.py` 通过：后台观察、点击并确认状态、长按并确认状态、Unicode set_text 并读回；密码遮蔽；跨显示器节点、失效 display ID、后台 IME 输入及通用 am 修改均被拒绝；输入全局焦点保持主屏。脚本删除测试任务并关闭虚拟屏。
+- 未调用模型，未读取短信/号码或主屏应用页面内容；未验证第三方 App 业务流程、跨显示器迁移恢复的兼容性及主屏和副屏同时输入。
+
 ## 0.9.0 — 2026-09-20
 
 应用、通知、悬浮窗、输入法、模块和文档统一显示 DroidPilot。包名及内部通信/密钥标识保留以兼容升级。编译与 APK 签名校验通过；发布前检查待提交文件并排除密钥、签名文件、日志、构建产物及缓存。本次未运行模型任务或额外真机功能测试。
