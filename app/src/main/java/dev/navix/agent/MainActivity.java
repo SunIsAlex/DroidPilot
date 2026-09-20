@@ -93,10 +93,12 @@ public final class MainActivity extends Activity {
         backgroundMode=new Switch(this); backgroundMode.setText("后台虚拟屏（实验性）");
         backgroundMode.setChecked(getSharedPreferences("config",0).getBoolean("background_mode",false)); column.addView(backgroundMode);
         label("AI 在隐藏的独立屏幕操作目标 App，主屏可继续使用。部分 App 不支持；后台输入仅支持标准文本控件，不切换主屏键盘。",14);
+        button("查看后台应用 / 移回主屏",() -> BackgroundTasks.show(this));
+        label("最近任务中的“DroidPilot 后台”卡片是返回入口，点击将应用移回主屏；划掉入口不会结束后台应用。",14);
         button("关闭后台虚拟屏 / 将应用移回主屏",() -> {
             if(AgentService.running) { toast("请先停止当前任务"); return; }
             new Thread(() -> {
-                try { JSONObject result=Wire.call(new JSONObject().put("op","background_close")); runOnUiThread(() -> toast(result.optBoolean("ok")?"后台虚拟屏已关闭，系统将处理应用任务迁移":"关闭失败："+result.optString("error"))); }
+                try { JSONObject result=Wire.call(new JSONObject().put("op","background_close")); BackgroundTasks.refresh(); runOnUiThread(() -> toast(result.optBoolean("ok")?"应用已移回主屏，后台虚拟屏已关闭":"关闭失败："+result.optString("error"))); }
                 catch(Exception error) { runOnUiThread(() -> toast("无法连接 Root 服务")); }
             }).start();
         });
@@ -196,6 +198,6 @@ public final class MainActivity extends Activity {
         try { if(backend.getSelectedItemPosition()==0 && Secrets.load(this).isEmpty()) { toast("请先填写 API key"); return; } } catch(Exception e) { toast("无法读取密钥，请重新保存"); return; }
         startForegroundService(new Intent(this,AgentService.class).putExtra("goal",text)); toast("正在执行；打开 App 时会直接跳转");
     }
-    @Override protected void onResume() { super.onResume(); foreground = new java.lang.ref.WeakReference<>(this); handler.post(ticker); }
+    @Override protected void onResume() { super.onResume(); BackgroundTasks.attach(this); foreground = new java.lang.ref.WeakReference<>(this); handler.post(ticker); }
     @Override protected void onPause() { foreground.clear(); handler.removeCallbacks(ticker); super.onPause(); }
 }

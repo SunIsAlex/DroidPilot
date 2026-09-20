@@ -162,16 +162,42 @@ public final class RootDaemon {
         java.util.List<AccessibilityNodeInfo> found = root.findAccessibilityNodeInfosByViewId("dev.navix.agent:id/test_status");
         boolean result = !found.isEmpty(); for (AccessibilityNodeInfo n : found) n.recycle(); return result;
     }
+    private void restoreTask(int taskId) throws Exception {
+        android.app.ActivityOptions options=android.app.ActivityOptions.makeBasic();
+        options.setLaunchDisplayId(0); options.setLaunchWindowingMode(1); options.setLaunchBounds(null);
+        int result=android.app.ActivityTaskManager.getService().startActivityFromRecents(taskId,options.toBundle());
+        if(result<0)throw new IllegalStateException("移回主屏失败："+result);
+        for(android.app.ActivityManager.RunningTaskInfo task:android.app.ActivityTaskManager.getService().getTasks(100,false,false,-1))
+            if(task.taskId==taskId&&task.displayId==0)return;
+        throw new IllegalStateException("系统未将应用移回主屏，保留虚拟屏以便重试");
+    }
     private synchronized JSONObject execute(JSONObject q) throws Exception {
         lastRequest = SystemClock.elapsedRealtime();
         String op = q.getString("op");
-        if(op.equals("background_open"))return new JSONObject().put("ok",true).put("display_id",background.open(new Handler(thread.getLooper()))).put("width",720).put("height",1280);
-        if(op.equals("background_close")) { clear(); background.close(); return new JSONObject().put("ok",true); }
+        if(op.equals("background_open")) { background.open(new Handler(thread.getLooper())); return background.metrics(); }
+        if(op.equals("background_restore")) {
+            int taskId=q.getInt("task_id"); String component=q.getString("component");
+            for(android.app.ActivityManager.RunningTaskInfo task:android.app.ActivityTaskManager.getService().getTasks(100,false,false,-1)) {
+                if(task.taskId==taskId&&task.userId==0&&task.baseActivity!=null&&component.equals(task.baseActivity.flattenToShortString())) {
+                    if(task.displayId!=0&&(background.id()<1||task.displayId!=background.id()))throw new IllegalStateException("应用已不在此虚拟屏");
+                    clear(); restoreTask(taskId);
+                    return new JSONObject().put("ok",true).put("task_id",taskId);
+                }
+            }
+            throw new IllegalStateException("后台任务已结束，请刷新列表");
+        }
+        if(op.equals("background_close")) {
+            clear();
+            if(background.id()>0)for(android.app.ActivityManager.RunningTaskInfo task:android.app.ActivityTaskManager.getService().getTasks(100,false,false,-1))
+                if(task.displayId==background.id()&&task.userId==0)restoreTask(task.taskId);
+            background.close(); return new JSONObject().put("ok",true);
+        }
         if(op.equals("background_status")) {
             JSONArray tasks=new JSONArray();
             if(background.id()>0)for(android.app.ActivityManager.RunningTaskInfo task:android.app.ActivityTaskManager.getService().getTasks(100,false,false,-1))
-                if(task.displayId==background.id())tasks.put(new JSONObject().put("task_id",task.taskId).put("component",task.topActivity==null?"":task.topActivity.flattenToShortString()));
-            return new JSONObject().put("ok",true).put("display_id",background.id()).put("tasks",tasks);
+                if(task.displayId==background.id()&&task.userId==0&&task.baseActivity!=null)tasks.put(new JSONObject().put("task_id",task.taskId)
+                    .put("component",task.baseActivity.flattenToShortString()).put("package",task.baseActivity.getPackageName()));
+            return background.metrics().put("tasks",tasks);
         }
         requestedDisplay=q.optInt("display_id",0);
         if(requestedDisplay!=0 && (requestedDisplay<0||requestedDisplay!=background.id()))throw new IllegalArgumentException("后台虚拟屏已失效；不会回退操作主屏");
@@ -202,7 +228,7 @@ public final class RootDaemon {
                 android.content.ComponentName base = task.baseActivity;
                 if (base != null && pkg.equals(base.getPackageName())) {
                     if(task.displayId!=requestedDisplay) {
-                        android.app.ActivityOptions options=android.app.ActivityOptions.makeBasic(); options.setLaunchDisplayId(requestedDisplay);
+                        android.app.ActivityOptions options=android.app.ActivityOptions.makeBasic(); options.setLaunchDisplayId(requestedDisplay); options.setLaunchWindowingMode(1); options.setLaunchBounds(null);
                         android.app.ActivityTaskManager.getService().startActivityFromRecents(task.taskId,options.toBundle());
                     } else {
                         android.app.ActivityTaskManager.getService().moveTaskToFront(null, "com.android.shell", task.taskId, 0, null);

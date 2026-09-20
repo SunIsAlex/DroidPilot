@@ -90,7 +90,9 @@ public final class AgentService extends Service {
     private int executionDisplay;
     private JSONObject phoneCall(JSONObject request) throws Exception {
         if(executionDisplay>0)request.put("display_id",executionDisplay);
-        return Wire.call(request);
+        JSONObject result=Wire.call(request);
+        if(executionDisplay>0)BackgroundTasks.refresh();
+        return result;
     }
     private long pausedMillis;
     private final java.util.ArrayDeque<String> journal=new java.util.ArrayDeque<>();

@@ -19,7 +19,12 @@ def focused_display():
 
 
 def observe(display):
-    page = call(op='observe', display_id=display)
+    deadline = time.monotonic() + 5
+    while True:
+        page = call(op='observe', display_id=display)
+        if page.get('ok') or time.monotonic() >= deadline:
+            break
+        time.sleep(0.3)
     assert page.get('ok') and page.get('display_id') == display, page
     assert page['package'] == 'dev.navix.agent'
     assert 'fixture-secret' not in json.dumps(page)
@@ -34,7 +39,11 @@ state = call(op='background_status')
 assert state.get('ok') and state['display_id'] < 0, 'Close existing background display before this test'
 before = focused_display()
 assert before == 0, 'Primary display must initially own input focus'
-display = call(op='background_open')['display_id']
+opened = call(op='background_open')
+display = opened['display_id']
+primary_size = re.findall(r'(\d+)x(\d+)', root('wm size'))[-1]
+primary_density = int(re.findall(r'\d+', root('wm density'))[-1])
+assert (opened['width'], opened['height'], opened['density_dpi']) == (*map(int, primary_size), primary_density), opened
 try:
     assert display > 0
     launched = call(op='start_intent', component='dev.navix.agent/.FixtureActivity',

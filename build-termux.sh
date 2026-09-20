@@ -47,8 +47,8 @@ mkdir -p "$BUILD_DIR/classes" "$BUILD_DIR/dex" "$BUILD_DIR/generated"
   --manifest "$PROJECT_DIR/app/src/main/AndroidManifest.xml" \
   --min-sdk-version 29 \
   --target-sdk-version 35 \
-  --version-code 13 \
-  --version-name 0.10.0 \
+  --version-code 14 \
+  --version-name 0.10.1 \
   --java "$BUILD_DIR/generated" \
   -o "$BUILD_DIR/unsigned.apk" \
   "$BUILD_DIR/resources.zip"
