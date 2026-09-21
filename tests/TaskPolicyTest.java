@@ -7,7 +7,7 @@ public final class TaskPolicyTest {
         expect(!TaskPolicy.request("test",messages,"auto",false).has("thinking"),"Automatic keeps provider default");
         expect(TaskPolicy.request("test",messages,"enabled",true).getJSONObject("thinking").getString("type").equals("enabled"),"Thinking on");
         expect(TaskPolicy.request("test",messages,"disabled",false).getJSONObject("thinking").getString("type").equals("disabled"),"Thinking off");
-        expect(TaskPolicy.tools(true).length()==TaskPolicy.tools(false).length()+1,"Goal adds completion tool");
+        expect(TaskPolicy.tools(true).length()==TaskPolicy.tools(false).length()+2,"Goal adds completion and clarification tools");
         JSONObject done=new JSONObject().put("summary","已打开设置").put("evidence","最新观察的包名为 com.android.settings");
         try{TaskPolicy.completion(done,true,false);throw new AssertionError("Completion without evidence");}catch(IllegalStateException expected){}
         try{TaskPolicy.completion(done,false,true);throw new AssertionError("Completion outside goal");}catch(IllegalStateException expected){}

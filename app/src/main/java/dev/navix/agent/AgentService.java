@@ -108,6 +108,7 @@ public final class AgentService extends Service {
             if(running)getSystemService(NotificationManager.class).notify(9,notification());
         });
     }
+    private final WebSearch webSearch = new WebSearch();
     private final DeepSeek api = new DeepSeek();
     private final CodexBackend codex = new CodexBackend();
     private final Set<String> launchable = new HashSet<>();
@@ -162,7 +163,7 @@ public final class AgentService extends Service {
         try {
             JSONObject q=Protocol.parseCall(call); String op=q.getString("op");
             check(); if(goalCompleted)throw new IllegalStateException("Goal already completed");
-            boolean reading=java.util.Arrays.asList("observe","list_apps","read_sms","get_phone_numbers","complete_task").contains(op)
+            boolean reading=java.util.Arrays.asList("observe","list_apps","read_sms","get_phone_numbers","web_search","complete_task").contains(op)
                 || (op.equals("am") && java.util.Arrays.asList("help","get-current-user","get-config","to-uri","to-intent-uri","to-app-uri").contains(q.getJSONArray("args").optString(0)));
             display(op.equals("wait") ? TaskOverlay.Phase.WAITING : reading ? TaskOverlay.Phase.OBSERVING : TaskOverlay.Phase.ACTING,TaskPolicy.describe(q));
             operation(TaskPolicy.describe(q));
@@ -173,6 +174,7 @@ public final class AgentService extends Service {
             if(op.equals("ask_user")) {
                 hasEvidence=false; result=askUser(q); check(); if(!backgroundMode)MainActivity.hideForObservation();
             }
+            else if(op.equals("web_search")) { result=webSearch.search(q); check(); }
             else if(op.equals("read_sms"))result=PhoneData.sms(this,q);
             else if(op.equals("get_phone_numbers"))result=PhoneData.numbers(this);
             else if(op.equals("list_apps")) result=new JSONObject().put("ok",true).put("apps",apps());
@@ -184,7 +186,7 @@ public final class AgentService extends Service {
             }
             boolean readOnlyAm=op.equals("am")&&java.util.Arrays.asList("help","get-current-user","get-config","to-uri","to-intent-uri","to-app-uri").contains(q.getJSONArray("args").optString(0));
             JSONObject observation=result.optJSONObject("observation");
-            hasEvidence=result.optBoolean("ok")&&(op.equals("observe")||op.equals("wait")||op.equals("list_apps")||op.equals("read_sms")||op.equals("get_phone_numbers")||readOnlyAm||(observation!=null&&observation.optBoolean("ok")));
+            hasEvidence=result.optBoolean("ok")&&(op.equals("observe")||op.equals("wait")||op.equals("list_apps")||op.equals("read_sms")||op.equals("get_phone_numbers")||(op.equals("web_search")&&result.optInt("result_count")>0)||readOnlyAm||(observation!=null&&observation.optBoolean("ok")));
         } catch(InterruptedException e) { throw e; }
         catch(Exception e) { result=new JSONObject().put("ok",false).put("error",e.getMessage()); }
         finally { if(!stopped)display(TaskOverlay.Phase.THINKING,"工具已返回，等待模型决定下一步"); }
@@ -288,7 +290,7 @@ public final class AgentService extends Service {
             });
         }
     }
-    private void cancel() { stopped = true; synchronized(pauseLock) { pauseRequested=false; pauseLock.notifyAll(); } api.cancel(); codex.cancel(); if (worker != null) worker.interrupt(); status = "正在停止…"; display(TaskOverlay.Phase.STOPPING,"停止后续操作，等待已发出请求返回"); }
+    private void cancel() { stopped = true; synchronized(pauseLock) { pauseRequested=false; pauseLock.notifyAll(); } api.cancel(); webSearch.cancel(); codex.cancel(); if (worker != null) worker.interrupt(); status = "正在停止…"; display(TaskOverlay.Phase.STOPPING,"停止后续操作，等待已发出请求返回"); }
     @Override public void onTimeout(int startId,int fgsType) { cancel(); status="系统后台运行时限已到，任务未完成"; stopSelf(); }
     @Override public void onDestroy() { if (running) cancel(); running=false; pendingQuestion=null; pauseRequested=false; OverlayService.finish(); super.onDestroy(); }
 }

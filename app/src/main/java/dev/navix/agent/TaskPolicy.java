@@ -32,6 +32,7 @@ final class TaskPolicy {
     static String describe(JSONObject q) {
         String op=q.optString("op");
         switch(op) {
+            case "web_search":return "正在搜索网络";
             case "observe":return "读取当前页面";
             case "list_apps":return "查询已安装应用";
             case "launch":case "launch_app":return "打开应用："+q.optString("package");
@@ -59,7 +60,7 @@ final class TaskPolicy {
         if(!goal)throw new IllegalStateException("Goal mode is not active");
         String summary=args.getString("summary").trim(),evidence=args.getString("evidence").trim();
         if(summary.isEmpty()||evidence.isEmpty()||summary.length()>2000||evidence.length()>4000)throw new IllegalArgumentException("请提供完成摘要和验证依据");
-        if(!hasEvidence)throw new IllegalStateException("尚无成功的页面观察或命令输出，请先验证结果");
+        if(!hasEvidence)throw new IllegalStateException("尚无成功的工具结果，请先验证结果");
         return new JSONObject().put("ok",true).put("goalCompleted",true).put("summary",summary).put("evidence",evidence);
     }
 }

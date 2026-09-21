@@ -11,7 +11,7 @@ public final class AmToolsTest {
     }
     public static void main(String[] args)throws Exception {
         List<String> launch=AmCommand.arguments(call("launch_app",new JSONObject().put("package","com.android.settings")));
-        require(launch.equals(Arrays.asList("start","-W","--user","0","-a","android.intent.action.MAIN","-c","android.intent.category.LAUNCHER","-p","com.android.settings","-f","0x10200000")),"Direct launch arguments");
+        require(launch.equals(Arrays.asList("start","-W","--user","0","-a","android.intent.action.MAIN","-c","android.intent.category.LAUNCHER","-p","com.android.settings","-f","0x10000000")),"Direct launch arguments");
         String literal="中文 ; $(id) `id` ' quoted & spaces";
         JSONObject intent=new JSONObject().put("action","android.intent.action.VIEW").put("data","demo://item?q=a&b=2")
             .put("component","dev.navix.agent/.FixtureActivity").put("flags","0x10000000").put("categories",new JSONArray().put("android.intent.category.DEFAULT"))

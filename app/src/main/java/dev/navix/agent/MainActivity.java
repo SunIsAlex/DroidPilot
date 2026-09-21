@@ -110,6 +110,7 @@ public final class MainActivity extends Activity {
             catch(ActivityNotFoundException e) { toast("请在系统设置中开启 DroidPilot 悬浮窗权限"); }
         });
         button("保存配置",() -> { if (save()) toast("配置已保存"); });
+        label("已启用网络搜索：两个 Provider 均可查询公开资料，无需额外密钥。搜索词发送至 Bing，结果摘要交给所选模型；搜索不会打开浏览器。",14);
         label("任务运行时，页面文字和控件信息会发送给所选后端。Codex 复用 Termux 的登录，无需在此填写密钥。语音由系统识别服务处理。",14);
         button("短信 / 号码权限设置",() -> requestPermissions(new String[]{"android.permission.READ_SMS","android.permission.READ_PHONE_NUMBERS","android.permission.READ_PHONE_STATE"},4));
         label("任务需要时，读取的短信和本机号码会发送给所选模型。仅提供读取工具，不发送或删除短信。",14);

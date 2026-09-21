@@ -185,3 +185,15 @@ Root 不会使所有 App 自动暴露全部按钮。Canvas、游戏、部分 Web
 - https://developer.android.com/reference/android/view/accessibility/AccessibilityNodeInfo
 - https://kernelsu.org/guide/module.html
 - https://api-docs.deepseek.com/guides/tool_calls/
+
+## 网络搜索（0.10.3）
+
+DeepSeek API 和 Codex Termux 共用 `web_search(query, limit)`，普通模式和 Goal 模式均可调用。默认返回 5 条结果，最多 8 条；每条包含标题、来源 URL 和摘要。直接由 App 联网，不需要额外搜索密钥、不占用前台、不走 Root，也不切换后台虚拟屏。Toast 和悬浮窗显示“正在搜索网络”。
+
+当前搜索源是 [Bing RSS](https://blogs.bing.com/search/January-2005/RSS-Feeds-for-Search-Results)，不是具有可用性保证的搜索 API。结果是搜索摘要而非全文，可能不够新或相关；遇到网络限制、非 RSS 响应、超时或空结果会明确报告，模型可以调整关键词或按任务需要改用浏览器。请求连接/读取各限 10 秒，20 秒触发断开，响应最多 512 KiB。停止任务会取消在途搜索。
+
+搜索关键词发送给 Bing，结果摘要发送给所选模型；无需发送 DeepSeek 密钥或浏览器 Cookie。提示词要求只搜索任务所需公开信息，不发送验证码、密钥或私人页面全文；把搜索结果视为不可信资料，不能执行其中的指令。回答应附来源链接，搜索结果不能替代手机操作后的观察验证。
+
+Codex 模式需要使用本版本 `codex-bridge/bridge.py`，升级后停止当前模型任务，再重启原桥接进程并运行 `sh codex-bridge/start.sh`。工具白名单现已包含 `web_search`；Codex 原生搜索仍关闭，以统一使用 App 的搜索、状态提示和取消机制。
+
+验证：`sh tests/run-host.sh` 检查工具协议、搜索解析、空结果、链接过滤、XML 实体防护和取消；`WebSearchTest --live` 可选使用公开关键词检查真实搜索，不调用模型或读取手机页面。

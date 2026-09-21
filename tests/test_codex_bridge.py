@@ -62,6 +62,11 @@ class BridgeTests(unittest.TestCase):
         a,b=socket.socketpair();b.sendall(b'\x7f\xff\xff\xff')
         with self.assertRaises(ValueError):m.receive(a)
         a.close();b.close()
+    def test_search_dynamic_tool_allowed(self):
+        schema={'type':'object','properties':{'query':{'type':'string'}},'required':['query']}
+        tool={'function':{'name':'web_search','description':'Search','parameters':schema}}
+        self.assertEqual(m.dynamic_tools([tool])[0]['name'],'web_search')
+        self.assertEqual(m.dynamic_tools([tool])[0]['inputSchema'],schema)
     def test_unknown_tool_rejected(self):
         with self.assertRaises(ValueError):m.dynamic_tools([{'function':{'name':'shell'}}])
 if __name__=='__main__':unittest.main()
