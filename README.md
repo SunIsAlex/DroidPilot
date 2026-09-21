@@ -197,3 +197,13 @@ DeepSeek API 和 Codex Termux 共用 `web_search(query, limit)`，普通模式�
 Codex 模式需要使用本版本 `codex-bridge/bridge.py`，升级后停止当前模型任务，再重启原桥接进程并运行 `sh codex-bridge/start.sh`。工具白名单现已包含 `web_search`；Codex 原生搜索仍关闭，以统一使用 App 的搜索、状态提示和取消机制。
 
 验证：`sh tests/run-host.sh` 检查工具协议、搜索解析、空结果、链接过滤、XML 实体防护和取消；`WebSearchTest --live` 可选使用公开关键词检查真实搜索，不调用模型或读取手机页面。
+
+## 默认数字助理与系统 TTS（0.11.0）
+
+安装新版 APK 后，在 DroidPilot 点击“设为默认数字助理”，进入系统设置并选择 DroidPilot；也可从“设置 → 应用 → 默认应用 → 数字助理应用”进入。通过 Android `ACTION_ASSIST` 注册助理入口，系统助理手势或按键唤起后会打开系统语音识别，结果填入任务框，再点击“开始执行”。已运行的任务不会被覆盖；若正在等待补充信息，语音输入填入回答框，点击提交后继续。系统未安装语音识别界面时可使用文字输入。长按电源键等映射由 ROM 的按键设置决定，本版不包含常驻麦克风、锁屏免解锁或语音唤醒词。
+
+开启“系统 TTS：播报结果和补充问题”后，DeepSeek/Codex 的任务结果和 Goal 补充问题会交给系统默认 TTS 引擎朗读。默认关闭并即时保存开关，提供试听、停止朗读、系统 TTS 设置；通知栏也可停止朗读。开始语音识别、停止模型任务或关闭开关会停止播报。每次最多朗读前 1500 字，全文仍保留在界面；播报结束释放引擎与音频焦点。
+
+需要支持中文的系统 TTS 引擎/语音包，不使用 OpenAI 语音 API；离线能力与文字是否上传由所选引擎决定。语音识别与文字转语音是两个独立系统组件。
+
+Android 官方依据：[助理角色资格（支持 ACTION_ASSIST 即可）](https://developer.android.com/reference/androidx/core/role/RoleManagerCompat#ROLE_ASSISTANT)、[TextToSpeech](https://developer.android.com/reference/android/speech/tts/TextToSpeech)。

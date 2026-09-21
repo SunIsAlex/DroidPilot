@@ -26,13 +26,14 @@ public final class AgentService extends Service {
             Question question=pendingQuestion;
             String text=intent.getStringExtra("answer");
             if(question==null||!question.id.equals(intent.getStringExtra("question_id"))||text==null||text.trim().isEmpty()||text.length()>2000)return;
-            if(userAnswer==null) { userAnswer=text.trim(); pauseLock.notifyAll(); }
+            if(userAnswer==null) { SpeechService.stop(this); userAnswer=text.trim(); pauseLock.notifyAll(); }
         }
     }
     private JSONObject askUser(JSONObject request) throws Exception {
         if(!goalMode)throw new IllegalStateException("ask_user 需要 Goal 模式");
         Question question=new Question(request); long started=SystemClock.elapsedRealtime();
         synchronized(pauseLock) { userAnswer=null; pendingQuestion=question; }
+        SpeechService.say(this,"需要你补充信息。"+question.text,false);
         codex.setPaused(true);
         status="等待你回答：请点击悬浮窗或通知打开助手";
         display(TaskOverlay.Phase.QUESTION,"缺少必要信息 · 点击回答");
@@ -125,6 +126,7 @@ public final class AgentService extends Service {
         if (intent!=null && "toggle_pause".equals(intent.getAction())) { togglePause(); if(worker==null)stopSelf(); return START_NOT_STICKY; }
         if (intent == null || "stop".equals(intent.getAction())) { cancel(); if (worker == null) stopSelf(); return START_NOT_STICKY; }
         if (running) return START_NOT_STICKY;
+        SpeechService.stop(this);
         getSystemService(NotificationManager.class).createNotificationChannel(new NotificationChannel("agent","任务运行",NotificationManager.IMPORTANCE_LOW));
         startForeground(9,notification()); running = true; stopped = false; status = "正在连接手机控制服务…";
         pauseRequested=false; pauseAcknowledged=false;
@@ -286,11 +288,12 @@ public final class AgentService extends Service {
             try { Wire.call(new JSONObject().put("op","release")); } catch (Exception ignored) {}
             uiHandler.post(() -> {
                 running=false; pendingQuestion=null; pauseRequested=false; pauseAcknowledged=false;
+                if(!stopped)SpeechService.say(this,status,false);
                 OverlayService.finish(); stopForeground(STOP_FOREGROUND_REMOVE); stopSelf();
             });
         }
     }
-    private void cancel() { stopped = true; synchronized(pauseLock) { pauseRequested=false; pauseLock.notifyAll(); } api.cancel(); webSearch.cancel(); codex.cancel(); if (worker != null) worker.interrupt(); status = "正在停止…"; display(TaskOverlay.Phase.STOPPING,"停止后续操作，等待已发出请求返回"); }
+    private void cancel() { SpeechService.stop(this); stopped = true; synchronized(pauseLock) { pauseRequested=false; pauseLock.notifyAll(); } api.cancel(); webSearch.cancel(); codex.cancel(); if (worker != null) worker.interrupt(); status = "正在停止…"; display(TaskOverlay.Phase.STOPPING,"停止后续操作，等待已发出请求返回"); }
     @Override public void onTimeout(int startId,int fgsType) { cancel(); status="系统后台运行时限已到，任务未完成"; stopSelf(); }
     @Override public void onDestroy() { if (running) cancel(); running=false; pendingQuestion=null; pauseRequested=false; OverlayService.finish(); super.onDestroy(); }
 }

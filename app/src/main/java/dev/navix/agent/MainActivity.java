@@ -25,7 +25,8 @@ public final class MainActivity extends Activity {
     private Spinner backend, deepseekThinking, codexThinking;
     private Switch goalMode, taskOverlay, backgroundMode;
     private LinearLayout deepseekFields, codexFields;
-    private TextView state, connection, questionText;
+    private TextView state, connection, questionText, assistantState;
+    private String voiceQuestionId;
     private LinearLayout questionCard, questionOptions;
     private EditText answerInput;
     private String displayedQuestion;
@@ -53,11 +54,25 @@ public final class MainActivity extends Activity {
     private LinearLayout column;
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
+        if(saved!=null)voiceQuestionId=saved.getString("voice_question_id");
         getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
         ScrollView scroll = new ScrollView(this); column = new LinearLayout(this); column.setOrientation(1); column.setPadding(36,64,36,36); scroll.addView(column); setContentView(scroll);
         TextView title = label("DroidPilot",30); title.setTextColor(Color.rgb(34,72,119));
         label("语音下达任务 · Root 语义控件操作",16);
         connection = label("正在检测 Root 模块…",14);
+        assistantState=label("",14);
+        button("设为默认数字助理",this::assistantSettings);
+        label("选中 DroidPilot 后，可用系统助理手势或按键唤起语音输入。识别后点击开始执行；运行中的任务不会被新指令覆盖。",14);
+        Switch speech=new Switch(this);speech.setText("系统 TTS：播报结果和补充问题");
+        speech.setChecked(getSharedPreferences("config",0).getBoolean("speech_enabled",false));column.addView(speech);
+        speech.setOnCheckedChangeListener((view,enabled) -> {getSharedPreferences("config",0).edit().putBoolean("speech_enabled",enabled).apply();if(!enabled)SpeechService.stop(this);});
+        label("使用系统默认中文语音引擎。部分引擎需要联网，播报文字会交给所选引擎；本功能不调用 OpenAI 语音 API。",14);
+        button("试听系统语音",() -> SpeechService.say(this,"你好，我是 DroidPilot。系统语音播报已准备好。",true));
+        button("停止朗读",() -> SpeechService.stop(this));
+        button("系统 TTS 设置",() -> {
+            try {startActivity(new Intent("com.android.settings.TTS_SETTINGS"));}
+            catch(ActivityNotFoundException error) {startActivity(new Intent(android.provider.Settings.ACTION_SETTINGS));toast("请在系统设置中搜索文字转语音");}
+        });
         label("Provider（决策后端）",16);
         backend = new Spinner(this);
         backend.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"DeepSeek API","Codex Termux"}));
@@ -119,6 +134,7 @@ public final class MainActivity extends Activity {
         label("模型需要你补充信息",20); questionText=label("",16);
         questionOptions=new LinearLayout(this); questionOptions.setOrientation(1); column.addView(questionOptions);
         answerInput=field("输入回答，或选择上方选项",false); answerInput.setSingleLine(false); answerInput.setMaxLines(4); answerInput.setSaveEnabled(false);
+        button("语音回答",this::voice);
         button("提交回答并继续",this::submitAnswer); column=mainColumn; questionCard.setVisibility(android.view.View.GONE);
         label("你想让手机做什么？",20); goal = field("例如：打开设置，找到显示设置",false); goal.setSingleLine(false); goal.setMinLines(2); goal.setMaxLines(5);
         button("🎙 说出指令",this::voice);
@@ -131,6 +147,7 @@ public final class MainActivity extends Activity {
         label("使用方法：先打开目标应用，再打开此助手输入指令。启动 App 时直接跳转；操作当前页面时助手退到后台。也可以直接让它打开某个应用。首版不支持持续语音唤醒。",14);
         if (Build.VERSION.SDK_INT>=33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=0) requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},2);
         probe();
+        if(saved==null)handleAssist(getIntent());
     }
     private Spinner choice(String[] labels,int selected) {
         Spinner s=new Spinner(this); s.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,labels));
@@ -183,14 +200,42 @@ public final class MainActivity extends Activity {
             } catch(Exception e) { runOnUiThread(() -> toast(e.getMessage())); }
         }).start();
     }
+    private void assistantSettings() {
+        for(String action:new String[]{android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS,android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS,android.provider.Settings.ACTION_SETTINGS}) {
+            try {startActivity(new Intent(action));return;}catch(ActivityNotFoundException ignored) {}
+        }
+        toast("请到设置 → 应用 → 默认应用 → 数字助理应用，选择 DroidPilot");
+    }
+    private void updateAssistantState() {
+        android.app.role.RoleManager roles=getSystemService(android.app.role.RoleManager.class);
+        boolean held=roles!=null&&roles.isRoleAvailable(android.app.role.RoleManager.ROLE_ASSISTANT)&&roles.isRoleHeld(android.app.role.RoleManager.ROLE_ASSISTANT);
+        assistantState.setText(held?"✓ DroidPilot 已是默认数字助理":"尚未设为默认数字助理");
+    }
+    private void handleAssist(Intent intent) {
+        if(intent==null||!Intent.ACTION_ASSIST.equals(intent.getAction()))return;
+        handler.post(() -> {
+            if(isFinishing()||isDestroyed())return;
+            if(AgentService.running&&AgentService.pendingQuestion==null)toast("当前任务正在执行，可在此暂停或停止");
+            else voice();
+        });
+    }
+    @Override protected void onSaveInstanceState(Bundle out) {super.onSaveInstanceState(out);out.putString("voice_question_id",voiceQuestionId);}
+    @Override protected void onNewIntent(Intent intent) {super.onNewIntent(intent);setIntent(intent);handleAssist(intent);}
     private void voice() {
+        SpeechService.stop(this);
+        AgentService.Question question=AgentService.pendingQuestion;
+        voiceQuestionId=question==null?null:question.id;
         Intent i=new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE,"zh-CN").putExtra(RecognizerIntent.EXTRA_PROMPT,"说出你想完成的任务");
         try { startActivityForResult(i,3); } catch(ActivityNotFoundException e) { toast("系统未提供语音输入界面，请先使用文字输入"); }
     }
     @Override protected void onActivityResult(int request,int result,Intent data) {
         super.onActivityResult(request,result,data);
-        if(request==3&&result==RESULT_OK&&data!=null) { ArrayList<String> matches=data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS); if(matches!=null&&!matches.isEmpty()) { goal.setText(matches.get(0)); toast("指令已识别，点击开始执行"); } }
+        if(request==3&&result==RESULT_OK&&data!=null) { ArrayList<String> matches=data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS); if(matches!=null&&!matches.isEmpty()) { if(voiceQuestionId!=null) {
+            AgentService.Question current=AgentService.pendingQuestion;
+            if(current!=null&&voiceQuestionId.equals(current.id)) {refreshQuestion();answerInput.setText(matches.get(0));toast("回答已识别，点击提交回答并继续");}
+            else toast("原问题已结束，请查看当前任务状态");
+        } else {goal.setText(matches.get(0));toast("指令已识别，点击开始执行");} } }
     }
     private void start() {
         if(AgentService.running) { toast("任务正在运行"); return; }
@@ -199,6 +244,6 @@ public final class MainActivity extends Activity {
         try { if(backend.getSelectedItemPosition()==0 && Secrets.load(this).isEmpty()) { toast("请先填写 API key"); return; } } catch(Exception e) { toast("无法读取密钥，请重新保存"); return; }
         startForegroundService(new Intent(this,AgentService.class).putExtra("goal",text)); toast("正在执行；打开 App 时会直接跳转");
     }
-    @Override protected void onResume() { super.onResume(); BackgroundTasks.attach(this); foreground = new java.lang.ref.WeakReference<>(this); handler.post(ticker); }
+    @Override protected void onResume() { super.onResume(); updateAssistantState(); BackgroundTasks.attach(this); foreground = new java.lang.ref.WeakReference<>(this); handler.post(ticker); }
     @Override protected void onPause() { foreground.clear(); handler.removeCallbacks(ticker); super.onPause(); }
 }

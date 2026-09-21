@@ -2,20 +2,22 @@
  <uses-permission android:name="android.permission.INTERNET"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+ <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
  <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
  <uses-permission android:name="android.permission.READ_SMS"/>
  <uses-permission android:name="android.permission.READ_PHONE_NUMBERS"/>
  <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
- <queries><package android:name="com.termux"/><intent><action android:name="android.speech.action.RECOGNIZE_SPEECH"/></intent><intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent></queries>
+ <queries><intent><action android:name="android.intent.action.TTS_SERVICE"/></intent><package android:name="com.termux"/><intent><action android:name="android.speech.action.RECOGNIZE_SPEECH"/></intent><intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent></queries>
  <application android:label="DroidPilot" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false" android:usesCleartextTraffic="false">
-  <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+  <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter><intent-filter><action android:name="android.intent.action.ASSIST"/><category android:name="android.intent.category.DEFAULT"/></intent-filter></activity>
   <activity android:name=".BackgroundTaskActivity" android:exported="false" android:label="DroidPilot 后台" android:taskAffinity="dev.navix.agent.background" android:documentLaunchMode="intoExisting" android:maxRecents="20"/>
   <activity android:name=".FixtureActivity" android:exported="true" android:label="DroidPilot 操作测试"/>
   <service android:name=".OverlayService" android:exported="false" android:foregroundServiceType="specialUse">
    <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-visible interactive phone-agent status overlay and pause/resume control; retained launcher after task completion"/>
   </service>
+  <service android:name=".SpeechService" android:exported="false" android:foregroundServiceType="mediaPlayback"/>
   <service android:name=".AgentService" android:exported="false" android:foregroundServiceType="dataSync"/>
   <service android:name=".AgentIme" android:label="DroidPilot 临时输入" android:permission="android.permission.BIND_INPUT_METHOD" android:exported="true">
    <intent-filter><action android:name="android.view.InputMethod"/></intent-filter>
